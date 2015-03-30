@@ -2,7 +2,6 @@ package msgQueue
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/iron-io/iron_go/mq"
 )
@@ -12,18 +11,27 @@ type DispatcherQueue struct {
 	IronQueue *mq.Queue
 }
 
-func CreateDispatcherQueue(name string) *DispatcherQueue {
-	return &DispatcherQueue{Name: name, IronQueue: mq.New(name)}
+func CreateDispatcherQueue(name string) (*DispatcherQueue, error) {
+	ironQueue := mq.New(name)
+
+	_, err := ironQueue.Info()
+	if err != nil {
+		return nil, err
+	}
+
+	return &DispatcherQueue{Name: name, IronQueue: ironQueue}, nil
 }
 
-func (queue *DispatcherQueue) PushMessage(msgType string, payload interface{}) {
+func (queue *DispatcherQueue) PushMessage(msgType string, payload interface{}) error {
 	json, marshalErr := json.Marshal(Message{Type: msgType, Payload: payload})
 	if marshalErr != nil {
-		log.Panicln(marshalErr)
+		return marshalErr
 	}
 
 	_, pushErr := queue.IronQueue.PushString(string(json))
 	if pushErr != nil {
-		log.Panicln(pushErr)
+		return pushErr
 	}
+
+	return nil
 }

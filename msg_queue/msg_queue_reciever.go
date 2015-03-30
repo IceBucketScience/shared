@@ -2,6 +2,7 @@ package msgQueue
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,16 +20,21 @@ type RecieverQueue struct {
 	Callbacks         map[string]map[string]callbackFunc
 }
 
-func CreateRecieverQueue(name string, baseUrl string, server *mux.Router) *RecieverQueue {
+func CreateRecieverQueue(name string, baseUrl string, server *mux.Router) (*RecieverQueue, error) {
 	callbacks := make(map[string]map[string]callbackFunc)
 	ironQueue := mq.New(name)
+
+	_, err := ironQueue.Info()
+	if err != nil {
+		return nil, err
+	}
 
 	ironQueue.AddSubscribers(baseUrl + "/queues/" + name)
 
 	queue := RecieverQueue{Name: name, IronQueue: ironQueue, LargestCallbackId: 0, Callbacks: callbacks}
 	server.HandleFunc("/queues/"+name, queue.recieveMessage).Methods("POST")
 
-	return &queue
+	return &queue, nil
 }
 
 func (queue *RecieverQueue) RegisterCallback(msgType string, callback callbackFunc) string {
@@ -45,14 +51,16 @@ func (queue *RecieverQueue) RegisterCallback(msgType string, callback callbackFu
 	return callbackId
 }
 
-func (queue *RecieverQueue) UnregisterCallback(callbackId string) {
+func (queue *RecieverQueue) UnregisterCallback(callbackId string) error {
 	for _, callbacks := range queue.Callbacks {
 		if callbacks != nil && callbacks[callbackId] != nil {
 			delete(callbacks, callbackId)
 		} else {
-			log.Panicln("callback " + callbackId + " was not registered")
+			return errors.New("callback " + callbackId + " was not registered")
 		}
 	}
+
+	return nil
 }
 
 func (queue *RecieverQueue) recieveMessage(rw http.ResponseWriter, req *http.Request) {
@@ -62,10 +70,8 @@ func (queue *RecieverQueue) recieveMessage(rw http.ResponseWriter, req *http.Req
 	if err != nil {
 		rw.WriteHeader(400)
 		log.Panicln(err)
-		return
 	} else if len(queue.Callbacks[message.Type]) < 1 {
 		rw.WriteHeader(400)
-		return
 	}
 
 	for _, callback := range queue.Callbacks[message.Type] {
