@@ -70,8 +70,10 @@ func (queue *RecieverQueue) recieveMessage(rw http.ResponseWriter, req *http.Req
 	if err != nil {
 		rw.WriteHeader(400)
 		log.Panicln(err)
+		return
 	} else if len(queue.Callbacks[message.Type]) < 1 {
 		rw.WriteHeader(400)
+		return
 	}
 
 	for _, callback := range queue.Callbacks[message.Type] {
