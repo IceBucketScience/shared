@@ -4,16 +4,50 @@ import (
 	"github.com/jmcvetta/neoism"
 )
 
-func CreateVolunteer(userId string, accessToken string) (*neoism.Node, error) {
-	node, err := db.CreateNode(neoism.Props{"fbId": userId, "accessToken": accessToken})
-	if err != nil {
-		return nil, err
+type Volunteer struct {
+	Node *neoism.Node
+}
+
+func CreateVolunteer(userId string, name string, accessToken string) (*Volunteer, error) {
+	person, personErr := CreatePerson(userId, name)
+	if personErr != nil {
+		return nil, personErr
 	}
 
-	node.AddLabel("Person")
+	node := person.Node
+
+	//TODO: check for errors on adding labels and properties
+
+	//TODO: due to a bug in neoism, right now I have to reset all properties. Once the bug is fixed,
+	//then I can use the following code to set the extra Volunteer properties:
+	/*person.SetProperty("accessToken", accessToken)
+	person.SetProperty("isIndexed", false)*/
+
+	//Temporary code to set properties until bug is fixed
+	props, _ := node.Properties()
+
+	props["accessToken"] = accessToken
+	props["isIndexed"] = false
+	node.SetProperties(props)
+	//End temporary code
+
 	node.AddLabel("Volunteer")
 
-	return node, nil
+	return &Volunteer{Node: node}, nil
+}
+
+func (volunteer *Volunteer) MarkAsIndexed() {
+	node := volunteer.Node
+	//TODO: check for errors on adding labels and properties
+	//TODO: once bug is fixed, use volunteer.SetProperty
+	props, _ := node.Properties()
+
+	props["isIndexed"] = true
+	node.SetProperties(props)
+}
+
+func (volunteer *Volunteer) hasBeenLinked(userId string) {
+
 }
 
 func FindIndexedVolunteer(userId string) (*neoism.Node, error) {
