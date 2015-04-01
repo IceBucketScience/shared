@@ -16,13 +16,13 @@ func CreateVolunteer(userId string, accessToken string) (*neoism.Node, error) {
 	return node, nil
 }
 
-func FindVolunteer(userId string) (*neoism.Node, error) {
+func FindIndexedVolunteer(userId string) (*neoism.Node, error) {
 	res := []struct {
 		Volunteer neoism.Node
 	}{}
 
 	err := db.Cypher(&neoism.CypherQuery{
-		Statement:  `MATCH (v:Volunteer) WHERE v.fbId = {userId} RETURN v`,
+		Statement:  `MATCH (v:Volunteer) WHERE v.fbId = {userId} AND v.isIndexed = true RETURN v`,
 		Parameters: neoism.Props{"userId": userId},
 		Result:     &res,
 	})
