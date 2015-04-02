@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"errors"
+
 	"github.com/jmcvetta/neoism"
 )
 
@@ -27,10 +29,7 @@ func (person *Person) GetDb() *neoism.Database {
 	return person.node.Db
 }
 
-func (person *Person) AddFriendshipWith(friend *Person) error {
-	/*_, err := person.node.Relate("FRIENDS", friend.node.Id(), neoism.Props{})
-	return err*/
-
+func (person *Person) addRelationshipTo(fbId string, relName string) error {
 	res := []struct {
 		F neoism.Relationship
 	}{}
@@ -39,17 +38,50 @@ func (person *Person) AddFriendshipWith(friend *Person) error {
 		Statement: `
             MATCH (p1:Person), (p2:Person)
             WHERE p1.fbId = {p1Id} AND p2.fbId = {p2Id}
-            MERGE (p1)-[f:FRIENDS]-(p2)
+            MERGE (p1)-[f:` + relName + `]-(p2)
             RETURN f
         `,
-		Parameters: neoism.Props{"p1Id": person.FbId, "p2Id": friend.FbId},
+		Parameters: neoism.Props{"p1Id": person.FbId, "p2Id": fbId},
 		Result:     &res,
 	})
 	if err != nil {
 		return err
+	} else if len(res) < 1 {
+		return errors.New("no new relationship created or existing relationship found")
 	}
 
 	return nil
+}
+
+func (person *Person) AddFriendshipWith(friendId string) error {
+	return person.addRelationshipTo(friendId, "FRIENDS")
+}
+
+func (person *Person) MarkAsLinkedTo(volunteer *Volunteer) error {
+	return person.addRelationshipTo(volunteer.FbId, "LINKED")
+}
+
+func (person *Person) IsLinkedTo(volunteer *Volunteer) (bool, error) {
+	res := []struct {
+		L neoism.Relationship
+	}{}
+
+	err := db.Cypher(&neoism.CypherQuery{
+		Statement: `
+            MATCH (p1:Person)-[l:LINKED]-(p2:Person)
+            WHERE p1.fbId = {p1Id} AND p2.fbId = {p2Id}
+            RETURN l
+        `,
+		Parameters: neoism.Props{"p1Id": person.FbId, "p2Id": volunteer.FbId},
+		Result:     &res,
+	})
+	if err != nil {
+		return false, err
+	} else if len(res) < 1 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func getPersonFromNode(node *neoism.Node) (*Person, error) {
@@ -63,7 +95,7 @@ func getPersonFromNode(node *neoism.Node) (*Person, error) {
 
 func GetPerson(userId string) (*Person, error) {
 	res := []struct {
-		Person neoism.Node `json:"p"`
+		P neoism.Node
 	}{}
 
 	err := db.Cypher(&neoism.CypherQuery{
@@ -79,9 +111,9 @@ func GetPerson(userId string) (*Person, error) {
 
 	// adds a db object to each node
 	for index, personData := range res {
-		personData.Person.Db = db
+		personData.P.Db = db
 		res[index] = personData
 	}
 
-	return getPersonFromNode(&res[0].Person)
+	return getPersonFromNode(&res[0].P)
 }
