@@ -75,13 +75,13 @@ func (volunteer *Volunteer) MarkAsIndexed() {
 	volunteer.IsIndexed = true
 }
 
-func FindIndexedVolunteer(userId string) (*Volunteer, error) {
+func FindVolunteer(userId string) (*Volunteer, error) {
 	res := []struct {
 		V neoism.Node
 	}{}
 
 	err := db.Cypher(&neoism.CypherQuery{
-		Statement:  `MATCH (v:Volunteer) WHERE v.fbId = {userId} AND v.isIndexed = true RETURN v`,
+		Statement:  `MATCH (v:Volunteer) WHERE v.fbId = {userId} RETURN v`,
 		Parameters: neoism.Props{"userId": userId},
 		Result:     &res,
 	})
