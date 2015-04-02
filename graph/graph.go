@@ -17,3 +17,5 @@ func InitGraph(dbUrl string) {
 
 	db = dbObj
 }
+
+type Graph map[string]*Person

@@ -2,19 +2,28 @@ package graph
 
 import (
 	"github.com/jmcvetta/neoism"
+	//"log"
 )
 
 type Volunteer struct {
-	Node *neoism.Node
+	Person
+
+	AccessToken string
+	IsIndexed   bool
 }
 
 func CreateVolunteer(userId string, name string, accessToken string) (*Volunteer, error) {
-	person, personErr := CreatePerson(userId, name)
+	person, personErr := GetPerson(userId)
+
+	if person == nil {
+		person, personErr = CreatePerson(userId, name)
+	}
+
 	if personErr != nil {
 		return nil, personErr
 	}
 
-	node := person.Node
+	node := person.node
 
 	//TODO: check for errors on adding labels and properties
 
@@ -33,26 +42,42 @@ func CreateVolunteer(userId string, name string, accessToken string) (*Volunteer
 
 	node.AddLabel("Volunteer")
 
-	return &Volunteer{Node: node}, nil
+	return &Volunteer{Person: *person, AccessToken: accessToken, IsIndexed: false}, nil
+}
+
+func getVolunteerFromNode(node *neoism.Node) (*Volunteer, error) {
+	props, err := node.Properties()
+	if err != nil {
+		return nil, err
+	}
+
+	person, getPersonErr := getPersonFromNode(node)
+	if getPersonErr != nil {
+		return nil, getPersonErr
+	}
+
+	return &Volunteer{
+		Person:      *person,
+		AccessToken: props["accessToken"].(string),
+		IsIndexed:   props["isIndexed"].(bool),
+	}, nil
 }
 
 func (volunteer *Volunteer) MarkAsIndexed() {
-	node := volunteer.Node
+	node := volunteer.node
 	//TODO: check for errors on adding labels and properties
 	//TODO: once bug is fixed, use volunteer.SetProperty
 	props, _ := node.Properties()
 
 	props["isIndexed"] = true
 	node.SetProperties(props)
+
+	volunteer.IsIndexed = true
 }
 
-func (volunteer *Volunteer) hasBeenLinked(userId string) {
-
-}
-
-func FindIndexedVolunteer(userId string) (*neoism.Node, error) {
+func FindIndexedVolunteer(userId string) (*Volunteer, error) {
 	res := []struct {
-		Volunteer neoism.Node
+		V neoism.Node
 	}{}
 
 	err := db.Cypher(&neoism.CypherQuery{
@@ -66,5 +91,41 @@ func FindIndexedVolunteer(userId string) (*neoism.Node, error) {
 		return nil, nil
 	}
 
-	return &res[0].Volunteer, nil
+	// adds a db object to each node
+	for index, volunteerData := range res {
+		volunteerData.V.Db = db
+		res[index] = volunteerData
+	}
+
+	return getVolunteerFromNode(&res[0].V)
+}
+
+func GetVolunteers() (map[string]*Volunteer, error) {
+	res := []struct {
+		V neoism.Node
+	}{}
+
+	err := db.Cypher(&neoism.CypherQuery{
+		Statement: `MATCH (v:Volunteer) RETURN v`,
+		Result:    &res,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	volunteers := map[string]*Volunteer{}
+
+	for _, volunteerData := range res {
+		volunteerNode := &volunteerData.V
+		volunteerNode.Db = db
+
+		volunteer, getVolunteerErr := getVolunteerFromNode(volunteerNode)
+		if getVolunteerErr != nil {
+			return nil, getVolunteerErr
+		}
+
+		volunteers[volunteer.FbId] = volunteer
+	}
+
+	return volunteers, nil
 }
