@@ -25,10 +25,6 @@ func CreatePerson(userId string, name string) (*Person, error) {
 	return &Person{node: node, FbId: userId, Name: name}, nil
 }
 
-func (person *Person) GetDb() *neoism.Database {
-	return person.node.Db
-}
-
 func (person *Person) addRelationshipTo(fbId string, relName string) error {
 	res := []struct {
 		F neoism.Relationship
@@ -82,6 +78,37 @@ func (person *Person) IsLinkedTo(volunteer *Volunteer) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (person *Person) GetFriends() (Graph, error) {
+	res := []struct {
+		P neoism.Node `json:"friends"`
+	}{}
+
+	err := db.Cypher(&neoism.CypherQuery{
+		Statement:  `MATCH (p:Person)-[:FRIENDS]-(friends) WHERE p.fbId = {fbId} RETURN friends`,
+		Parameters: neoism.Props{"fbId": person.FbId},
+		Result:     &res,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	friends := Graph{}
+
+	for _, personData := range res {
+		personNode := &personData.P
+		personNode.Db = db
+
+		person, getPersonErr := getPersonFromNode(personNode)
+		if getPersonErr != nil {
+			return nil, getPersonErr
+		}
+
+		friends[person.FbId] = person
+	}
+
+	return friends, nil
 }
 
 func getPersonFromNode(node *neoism.Node) (*Person, error) {

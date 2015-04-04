@@ -1,6 +1,9 @@
 package facebook
 
 import (
+	"strconv"
+	"time"
+
 	fb "github.com/huandu/facebook"
 )
 
@@ -75,4 +78,109 @@ func (session *Session) GetMutualFriendsWith(userId string) ([]*Person, error) {
 	}
 
 	return mutualFriends, nil
+}
+
+type RawPost struct {
+	Id            string  `facebook:"id"`
+	Message       string  `facebook:"message"`
+	Poster        *Person `facebook:"from"`
+	To            *To     `facebook:"to"`
+	WithTagged    *Tags   `facebook:"with_tags"`
+	MessageTagged *Tags   `facebook:"message_tags"`
+	CreatedTime   string  `facebook:"created_time"`
+}
+
+type To struct {
+	Data []*Person `facebook:"data"`
+}
+
+type Tags struct {
+	Data []*Person `facebook:"data"`
+}
+
+type Feed []*RawPost
+
+func toFbTimeString(t time.Time) string {
+	return "" + strconv.Itoa(t.Year()) + "-" + strconv.Itoa(int(t.Month())) + "-" + strconv.Itoa(t.Day()) + "T" + strconv.Itoa(t.Hour()) + ":" + strconv.Itoa(t.Minute()) + ":" + strconv.Itoa(t.Second())
+}
+
+func (session *Session) GetUsersPostsBetween(userId string, startTime time.Time, endTime time.Time) ([]*Post, error) {
+	var feed Feed
+	res, getPostsErr := session.fbSession.Get("/"+userId+"/feed", fb.Params{
+		"since": toFbTimeString(startTime),
+		"until": toFbTimeString(endTime),
+	})
+	if getPostsErr != nil {
+		return nil, getPostsErr
+	}
+
+	decodeErr := res.DecodeField("data", &feed)
+	if decodeErr != nil {
+		return nil, decodeErr
+	}
+
+	posts := []*Post{}
+
+	for _, rawPost := range feed {
+		posts = append(posts, rawPost.ConvertToPost())
+	}
+
+	return posts, nil
+}
+
+type Post struct {
+	Id          string
+	Message     string
+	Poster      *Person
+	Tagged      []*Person
+	CreatedTime time.Time
+}
+
+func (rawPost *RawPost) ConvertToPost() *Post {
+	return &Post{
+		Id:          rawPost.Id,
+		Message:     rawPost.Message,
+		Poster:      rawPost.Poster,
+		Tagged:      consolidateTags(rawPost),
+		CreatedTime: fromFbTimeStringToTime(rawPost.CreatedTime),
+	}
+}
+
+func fromFbTimeStringToTime(timeStr string) time.Time {
+	//TODO: no hardcoding!
+	return time.Date(2014, 10, 1, 0, 0, 0, 0, time.UTC)
+}
+
+func consolidateTags(rawPost *RawPost) []*Person {
+	tagged := []*Person{}
+	alreadyTagged := map[string]bool{}
+
+	if rawPost.To != nil {
+		for _, person := range rawPost.To.Data {
+			if !alreadyTagged[person.UserId] {
+				tagged = append(tagged, person)
+				alreadyTagged[person.UserId] = true
+			}
+		}
+	}
+
+	if rawPost.WithTagged != nil {
+		for _, person := range rawPost.WithTagged.Data {
+			if !alreadyTagged[person.UserId] {
+				tagged = append(tagged, person)
+				alreadyTagged[person.UserId] = true
+			}
+		}
+	}
+
+	if rawPost.MessageTagged != nil {
+		for _, person := range rawPost.MessageTagged.Data {
+			if !alreadyTagged[person.UserId] {
+				tagged = append(tagged, person)
+				alreadyTagged[person.UserId] = true
+			}
+		}
+	}
+
+	return tagged
 }
