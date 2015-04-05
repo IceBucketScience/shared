@@ -138,17 +138,18 @@ type Post struct {
 
 func (rawPost *RawPost) ConvertToPost() *Post {
 	return &Post{
-		Id:          rawPost.Id,
-		Message:     rawPost.Message,
-		Poster:      rawPost.Poster,
-		Tagged:      consolidateTags(rawPost),
-		CreatedTime: fromFbTimeStringToTime(rawPost.CreatedTime),
+		Id:      rawPost.Id,
+		Message: rawPost.Message,
+		Poster:  rawPost.Poster,
+		Tagged:  consolidateTags(rawPost),
+		//rounding in time is to account for inconsistent timestamps returned by Facebook
+		CreatedTime: fromFbTimeStringToTime(rawPost.CreatedTime).Round(time.Minute * 5),
 	}
 }
 
 func fromFbTimeStringToTime(timeStr string) time.Time {
-	//TODO: no hardcoding!
-	return time.Date(2014, 10, 1, 0, 0, 0, 0, time.UTC)
+	t, _ := time.Parse("2006-01-02T15:04:05-0700", timeStr)
+	return t
 }
 
 func consolidateTags(rawPost *RawPost) []*Person {

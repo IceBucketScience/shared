@@ -17,8 +17,8 @@ func InitGraph(dbUrl string) {
 
 	db = dbObj
 
+	//constraint creation to avoid duplicate Posts from MERGE calls caused by race condition
 	res := []struct{}{}
-
 	constraintErr := db.Cypher(&neoism.CypherQuery{
 		Statement: `CREATE CONSTRAINT ON (p:Post) ASSERT p.fbId IS UNIQUE`,
 		Result:    &res,
