@@ -80,6 +80,7 @@ func (person *Person) IsLinkedTo(volunteer *Volunteer) (bool, error) {
 	return true, nil
 }
 
+//TODO: switch return val to pointer
 func (person *Person) GetFriends() (Graph, error) {
 	res := []struct {
 		P neoism.Node `json:"friends"`
@@ -106,6 +107,55 @@ func (person *Person) GetFriends() (Graph, error) {
 		}
 
 		friends[person.FbId] = person
+	}
+
+	return friends, nil
+}
+
+type Friendship struct {
+	rel      *neoism.Relationship
+	SourceId string
+	TargetId string
+}
+
+type FriendshipRes struct {
+	Id int `json:"id"`
+}
+
+func (friendship *Friendship) GetRelationshipId() int {
+	return friendship.rel.Id()
+}
+
+func GetFriendshipsInNetwork(personId string) ([]*Friendship, error) {
+	res := []struct {
+		SourceId string              `json:"sourceId"`
+		TargetId string              `json:"targetId"`
+		F        neoism.Relationship `json:"f"`
+	}{}
+
+	err := db.Cypher(&neoism.CypherQuery{
+		Statement: `
+            MATCH (v:Person {fbId: {fbId}})-[f:FRIENDS]->(friend:Person) 
+                RETURN v.fbId AS sourceId, f, friend.fbId AS targetId
+            UNION MATCH (v:Person {fbId: {fbId}})-[:FRIENDS]-(p:Person)-[f:FRIENDS]->(friend:Person) 
+                RETURN p.fbId AS sourceId, f, friend.fbId AS targetId
+        `,
+		Parameters: neoism.Props{"fbId": personId},
+		Result:     &res,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	friends := []*Friendship{}
+
+	for _, friendshipData := range res {
+		friendshipNode := &friendshipData.F
+		friendshipNode.Db = db
+
+		friendship := &Friendship{SourceId: friendshipData.SourceId, TargetId: friendshipData.TargetId, rel: friendshipNode}
+
+		friends = append(friends, friendship)
 	}
 
 	return friends, nil

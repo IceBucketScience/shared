@@ -98,14 +98,19 @@ func getPostFromNode(node *neoism.Node) (*Post, error) {
 	return &Post{node: node, FbId: props["fbId"].(string), Message: props["message"].(string), TimeCreated: time.Unix(int64(props["timeCreated"].(float64)), 0)}, nil
 }
 
-func GetPost(postId string) (*Post, error) {
+func GetPostsInOrder(userId string) ([]*Post, error) {
 	res := []struct {
 		P neoism.Node
 	}{}
 
 	err := db.Cypher(&neoism.CypherQuery{
-		Statement:  `MATCH (p:Post) WHERE p.fbId = {postId} RETURN p`,
-		Parameters: neoism.Props{"postId": postId},
+		Statement: `
+            MATCH (:Person {fbId: {fbId}})-[:POSTED]->(posts:Post) RETURN posts
+            UNION MATCH (:Person {fbId: {fbId}})-[:TAGGED]->(posts:Post) RETURN posts
+            UNION MATCH (:Person {fbId: {fbId}})-[:FRIENDS]->(friend:Person)-[:POSTED]->(posts:Post) RETURN posts
+            UNION MATCH (:Person {fbId: {fbId}})-[:FRIENDS]->(friend:Person)<-[:TAGGED]-(posts:Post) RETURN posts
+        `,
+		Parameters: neoism.Props{"fbId": userId},
 		Result:     &res,
 	})
 	if err != nil {

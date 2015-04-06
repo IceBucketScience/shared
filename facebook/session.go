@@ -1,6 +1,7 @@
 package facebook
 
 import (
+	"encoding/json"
 	"strconv"
 	"time"
 
@@ -13,6 +14,24 @@ type Session struct {
 
 func CreateSession(accessToken string) *Session {
 	return &Session{fbSession: fbClient.Session(accessToken)}
+}
+
+func (session *Session) GetPermissions(userId string) (map[string]bool, error) {
+	res, fbErr := session.fbSession.Get("/"+userId+"/permissions", nil)
+	if fbErr != nil {
+		return nil, fbErr
+	}
+
+	rawPermissions := res["data"].([]interface{})[0].(map[string]interface{})
+	permissions := map[string]bool{}
+
+	for permissionName, permissionStatus := range rawPermissions {
+		if permissionStatus.(json.Number) == "1" {
+			permissions[permissionName] = true
+		}
+	}
+
+	return permissions, nil
 }
 
 func (session *Session) GetInfo() (*Person, error) {
