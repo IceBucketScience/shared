@@ -98,7 +98,7 @@ func getPostFromNode(node *neoism.Node) (*Post, error) {
 	return &Post{node: node, FbId: props["fbId"].(string), Message: props["message"].(string), TimeCreated: time.Unix(int64(props["timeCreated"].(float64)), 0)}, nil
 }
 
-func GetPostsInOrder(userId string) ([]*Post, error) {
+/*func GetPostsInOrder(userId string) ([]*Post, error) {
 	res := []struct {
 		P neoism.Node
 	}{}
@@ -126,4 +126,4 @@ func GetPostsInOrder(userId string) ([]*Post, error) {
 	}
 
 	return getPostFromNode(&res[0].P)
-}
+}*/

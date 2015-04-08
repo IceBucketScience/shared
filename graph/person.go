@@ -114,6 +114,7 @@ func (person *Person) GetFriends() (Graph, error) {
 
 type Friendship struct {
 	rel      *neoism.Relationship
+	Id       int
 	SourceId string
 	TargetId string
 }
@@ -123,7 +124,8 @@ type FriendshipRes struct {
 }
 
 func (friendship *Friendship) GetRelationshipId() int {
-	return friendship.rel.Id()
+	//return friendship.rel.Id()
+	return friendship.Id
 }
 
 func GetFriendshipsInNetwork(personId string) ([]*Friendship, error) {
@@ -147,18 +149,18 @@ func GetFriendshipsInNetwork(personId string) ([]*Friendship, error) {
 		return nil, err
 	}
 
-	friends := []*Friendship{}
+	friendships := []*Friendship{}
 
 	for _, friendshipData := range res {
-		friendshipNode := &friendshipData.F
-		friendshipNode.Db = db
+		friendshipRel := &friendshipData.F
+		friendshipRel.Db = db
 
-		friendship := &Friendship{SourceId: friendshipData.SourceId, TargetId: friendshipData.TargetId, rel: friendshipNode}
+		friendship := &Friendship{Id: friendshipRel.Id(), SourceId: friendshipData.SourceId, TargetId: friendshipData.TargetId, rel: friendshipRel}
 
-		friends = append(friends, friendship)
+		friendships = append(friendships, friendship)
 	}
 
-	return friends, nil
+	return friendships, nil
 }
 
 func getPersonFromNode(node *neoism.Node) (*Person, error) {
