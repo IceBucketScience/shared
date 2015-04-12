@@ -2,6 +2,8 @@ package graph
 
 import (
 	"errors"
+	//"log"
+	"time"
 
 	"github.com/jmcvetta/neoism"
 )
@@ -9,7 +11,9 @@ import (
 type Person struct {
 	node *neoism.Node
 
-	FbId, Name string
+	FbId, Name                     string
+	HasBeenNominated, HasCompleted bool
+	TimeNominated                  int
 }
 
 func CreatePerson(userId string, name string) (*Person, error) {
@@ -98,10 +102,10 @@ func (person *Person) GetFriends() (Graph, error) {
 	friends := Graph{}
 
 	for _, personData := range res {
-		personNode := &personData.P
+		personNode := personData.P
 		personNode.Db = db
 
-		person, getPersonErr := getPersonFromNode(personNode)
+		person, getPersonErr := getPersonFromNode(&personNode)
 		if getPersonErr != nil {
 			return nil, getPersonErr
 		}
@@ -110,6 +114,49 @@ func (person *Person) GetFriends() (Graph, error) {
 	}
 
 	return friends, nil
+}
+
+func (person *Person) AddNomination(nominatedBy *Person, nominationTime time.Time) error {
+	res := []struct {
+		N neoism.Relationship
+	}{}
+
+	err := db.Cypher(&neoism.CypherQuery{
+		Statement: `
+            MATCH (p1:Person {fbId: {p1Id}}), (p2:Person {fbId: {p2Id}})
+            MERGE (p1)-[n:NOMINATED {timeNominated: {timeNominated}}]->(p2)
+            RETURN n
+        `,
+		Parameters: neoism.Props{"p1Id": nominatedBy.FbId, "p2Id": person.FbId, "timeNominated": nominationTime.Unix()},
+		Result:     &res,
+	})
+	if err != nil {
+		return err
+	} else if len(res) < 1 {
+		return errors.New("no new relationship created or existing relationship found")
+	}
+
+	return nil
+}
+
+func (person *Person) AddNominationTime(nominationTime time.Time) error {
+	person.HasBeenNominated = true
+
+	props, _ := person.node.Properties()
+	props["timeNominated"] = nominationTime.Unix()
+	return person.node.SetProperties(props)
+}
+
+func (person *Person) AddCompletionTime(completionTime time.Time) error {
+	person.HasBeenNominated = true
+	person.HasCompleted = true
+
+	props, _ := person.node.Properties()
+	if props["timeNominated"] == nil {
+		props["timeNominated"] = completionTime.Unix()
+	}
+	props["timeCompleted"] = completionTime.Unix()
+	return person.node.SetProperties(props)
 }
 
 type Friendship struct {
@@ -169,7 +216,19 @@ func getPersonFromNode(node *neoism.Node) (*Person, error) {
 		return nil, err
 	}
 
-	return &Person{node: node, FbId: props["fbId"].(string), Name: props["name"].(string)}, nil
+	var timeNominated int
+	if props["timeNominated"] != nil {
+		timeNominated = int(props["timeNominated"].(float64))
+	}
+
+	return &Person{
+		node:             node,
+		FbId:             props["fbId"].(string),
+		Name:             props["name"].(string),
+		HasBeenNominated: props["timeNominated"] != nil,
+		TimeNominated:    timeNominated,
+		HasCompleted:     props["timeCompleted"] != nil,
+	}, nil
 }
 
 func GetPerson(userId string) (*Person, error) {

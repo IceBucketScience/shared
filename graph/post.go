@@ -2,6 +2,8 @@ package graph
 
 import (
 	"errors"
+	//"log"
+	"sort"
 	"time"
 
 	"github.com/jmcvetta/neoism"
@@ -65,6 +67,70 @@ func (post *Post) AddPoster(fbId string) error {
 	return nil
 }
 
+func (post *Post) GetPoster() (*Person, error) {
+	res := []struct {
+		P neoism.Node
+	}{}
+
+	err := db.Cypher(&neoism.CypherQuery{
+		Statement: `
+            MATCH (p:Person)-[:POSTED]->(:Post {fbId: {postId}}) RETURN p
+        `,
+		Parameters: neoism.Props{"postId": post.FbId},
+		Result:     &res,
+	})
+
+	if err != nil {
+		return nil, err
+	} else if len(res) < 1 {
+		return nil, nil
+	}
+
+	// adds a db object to each node
+	for index, personData := range res {
+		personData.P.Db = db
+		res[index] = personData
+	}
+
+	return getPersonFromNode(&res[0].P)
+}
+
+func (post *Post) GetTagged() ([]*Person, error) {
+	res := []struct {
+		P neoism.Node
+	}{}
+
+	err := db.Cypher(&neoism.CypherQuery{
+		Statement: `
+            MATCH (:Post {fbId: {postId}})-[:TAGGED]->(p:Person) RETURN p
+        `,
+		Parameters: neoism.Props{"postId": post.FbId},
+		Result:     &res,
+	})
+
+	if err != nil {
+		return nil, err
+	} else if len(res) < 1 {
+		return []*Person{}, nil
+	}
+
+	tagged := []*Person{}
+
+	for _, personData := range res {
+		personNode := personData.P
+		personNode.Db = db
+
+		person, getPersonErr := getPersonFromNode(&personNode)
+		if getPersonErr != nil {
+			return nil, getPersonErr
+		}
+
+		tagged = append(tagged, person)
+	}
+
+	return tagged, nil
+}
+
 func (post *Post) AddTagged(fbId string) error {
 	res := []struct {
 		T neoism.Relationship
@@ -98,17 +164,34 @@ func getPostFromNode(node *neoism.Node) (*Post, error) {
 	return &Post{node: node, FbId: props["fbId"].(string), Message: props["message"].(string), TimeCreated: time.Unix(int64(props["timeCreated"].(float64)), 0)}, nil
 }
 
-/*func GetPostsInOrder(userId string) ([]*Post, error) {
+type OrderedPosts []*Post
+
+func (posts OrderedPosts) Len() int {
+	return len(posts)
+}
+
+func (posts OrderedPosts) Less(i int, j int) bool {
+	return posts[i].TimeCreated.Unix() < posts[j].TimeCreated.Unix()
+}
+
+func (posts OrderedPosts) Swap(i int, j int) {
+	temp := posts[i]
+	posts[i] = posts[j]
+	posts[j] = temp
+}
+
+func GetPostsInOrder(userId string) ([]*Post, error) {
 	res := []struct {
-		P neoism.Node
+		P           neoism.Node `json:"posts"`
+		TimeCreated int         `json:"posts.timeCreated"`
 	}{}
 
 	err := db.Cypher(&neoism.CypherQuery{
 		Statement: `
-            MATCH (:Person {fbId: {fbId}})-[:POSTED]->(posts:Post) RETURN posts
-            UNION MATCH (:Person {fbId: {fbId}})-[:TAGGED]->(posts:Post) RETURN posts
-            UNION MATCH (:Person {fbId: {fbId}})-[:FRIENDS]->(friend:Person)-[:POSTED]->(posts:Post) RETURN posts
-            UNION MATCH (:Person {fbId: {fbId}})-[:FRIENDS]->(friend:Person)<-[:TAGGED]-(posts:Post) RETURN posts
+            MATCH (:Person {fbId: {fbId}})-[:POSTED]->(posts:Post) RETURN posts, posts.timeCreated
+            UNION MATCH (:Person {fbId: {fbId}})<-[:TAGGED]-(posts:Post) RETURN posts, posts.timeCreated
+            UNION MATCH (:Person {fbId: {fbId}})-[:FRIENDS]->(friend:Person)-[:POSTED]->(posts:Post) RETURN posts, posts.timeCreated
+            UNION MATCH (:Person {fbId: {fbId}})-[:FRIENDS]->(friend:Person)<-[:TAGGED]-(posts:Post) RETURN posts, posts.timeCreated
         `,
 		Parameters: neoism.Props{"fbId": userId},
 		Result:     &res,
@@ -116,14 +199,24 @@ func getPostFromNode(node *neoism.Node) (*Post, error) {
 	if err != nil {
 		return nil, err
 	} else if len(res) < 1 {
-		return nil, nil
+		return []*Post{}, nil
 	}
 
-	// adds a db object to each node
-	for index, postData := range res {
-		postData.P.Db = db
-		res[index] = postData
+	posts := OrderedPosts{}
+
+	for _, postData := range res {
+		postNode := &postData.P
+		postNode.Db = db
+
+		post, getPostErr := getPostFromNode(postNode)
+		if getPostErr != nil {
+			return nil, getPostErr
+		}
+
+		posts = append(posts, post)
 	}
 
-	return getPostFromNode(&res[0].P)
-}*/
+	sort.Sort(posts)
+
+	return posts, nil
+}
