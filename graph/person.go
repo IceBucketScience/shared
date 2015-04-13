@@ -2,7 +2,6 @@ package graph
 
 import (
 	"errors"
-	//"log"
 	"time"
 
 	"github.com/jmcvetta/neoism"
@@ -14,6 +13,7 @@ type Person struct {
 	FbId, Name                     string
 	HasBeenNominated, HasCompleted bool
 	TimeNominated                  int
+	TimeCompleted                  int
 }
 
 func CreatePerson(userId string, name string) (*Person, error) {
@@ -61,18 +61,18 @@ func (person *Person) MarkAsLinkedTo(volunteer *Volunteer) error {
 	return person.addRelationshipTo(volunteer.FbId, "LINKED")
 }
 
-func (person *Person) IsLinkedTo(volunteer *Volunteer) (bool, error) {
+func relationshipExists(person1Id string, person2Id string, relName string) (bool, error) {
 	res := []struct {
 		L neoism.Relationship
 	}{}
 
 	err := db.Cypher(&neoism.CypherQuery{
 		Statement: `
-            MATCH (p1:Person)-[l:LINKED]-(p2:Person)
+            MATCH (p1:Person)-[l:` + relName + `]-(p2:Person)
             WHERE p1.fbId = {p1Id} AND p2.fbId = {p2Id}
             RETURN l
         `,
-		Parameters: neoism.Props{"p1Id": person.FbId, "p2Id": volunteer.FbId},
+		Parameters: neoism.Props{"p1Id": person1Id, "p2Id": person2Id},
 		Result:     &res,
 	})
 	if err != nil {
@@ -82,6 +82,10 @@ func (person *Person) IsLinkedTo(volunteer *Volunteer) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (person *Person) IsLinkedTo(volunteer *Volunteer) (bool, error) {
+	return relationshipExists(person.FbId, volunteer.FbId, "LINKED")
 }
 
 //TODO: switch return val to pointer
@@ -114,6 +118,10 @@ func (person *Person) GetFriends() (Graph, error) {
 	}
 
 	return friends, nil
+}
+
+func NominationExists(person1Id string, person2Id string) (bool, error) {
+	return relationshipExists(person1Id, person2Id, "NOMINATED")
 }
 
 func (person *Person) AddNomination(nominatedBy *Person, nominationTime time.Time) error {
@@ -221,6 +229,11 @@ func getPersonFromNode(node *neoism.Node) (*Person, error) {
 		timeNominated = int(props["timeNominated"].(float64))
 	}
 
+	var timeCompleted int
+	if props["timeCompleted"] != nil {
+		timeCompleted = int(props["timeCompleted"].(float64))
+	}
+
 	return &Person{
 		node:             node,
 		FbId:             props["fbId"].(string),
@@ -228,6 +241,7 @@ func getPersonFromNode(node *neoism.Node) (*Person, error) {
 		HasBeenNominated: props["timeNominated"] != nil,
 		TimeNominated:    timeNominated,
 		HasCompleted:     props["timeCompleted"] != nil,
+		TimeCompleted:    timeCompleted,
 	}, nil
 }
 
