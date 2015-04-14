@@ -2,6 +2,7 @@ package graph
 
 import (
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/jmcvetta/neoism"
@@ -216,6 +217,34 @@ func GetFriendshipsInNetwork(personId string) ([]*Friendship, error) {
 	}
 
 	return friendships, nil
+}
+
+func GetFriendshipIdsWithNominations(personId string) ([]string, error) {
+	res := []struct {
+		Id int `json:"id"`
+	}{}
+
+	err := db.Cypher(&neoism.CypherQuery{
+		Statement: `
+	          MATCH (v:Person {fbId: {personId}})-[:FRIENDS]-(p:Person)-[:NOMINATED]->(friends)-[f:FRIENDS]-(p)
+	              RETURN Id(f) AS id
+	          UNION MATCH (v:Person {fbId: {personId}})-[:NOMINATED]->(friends)-[f:FRIENDS]-(v)
+	              RETURN Id(f) AS id
+	      `,
+		Parameters: neoism.Props{"personId": personId},
+		Result:     &res,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	friendshipIds := []string{}
+
+	for _, friendshipData := range res {
+		friendshipIds = append(friendshipIds, strconv.Itoa(friendshipData.Id))
+	}
+
+	return friendshipIds, nil
 }
 
 func getPersonFromNode(node *neoism.Node) (*Person, error) {
