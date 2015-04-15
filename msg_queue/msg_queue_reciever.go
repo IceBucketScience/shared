@@ -24,10 +24,10 @@ func CreateRecieverQueue(name string, baseUrl string, server *mux.Router) (*Reci
 	callbacks := make(map[string]map[string]callbackFunc)
 	ironQueue := mq.New(name)
 
-	/*_, err := ironQueue.Info()
+	_, err := ironQueue.Info()
 	if err != nil {
 		return nil, err
-	}*/
+	}
 
 	ironQueue.AddSubscribers(baseUrl + "/queues/" + name)
 

@@ -14,6 +14,20 @@ func InitFbClient(appId string, appSecret string) {
 }
 
 func GetLongTermToken(shortTermToken string) (token string, expires int, err error) {
-	//TODO: check on getting actual long-term access token
 	return fbClient.ExchangeToken(shortTermToken)
+}
+
+func TokenIsValid(token string) (bool, error) {
+	res, err := fb.Get("/debug_token", fb.Params{"input_token": token, "access_token": fbClient.AppAccessToken()})
+	if err != nil {
+		return false, err
+	}
+
+	data := res["data"].(map[string]interface{})
+
+	if data == nil || !data["is_valid"].(bool) {
+		return false, nil
+	}
+
+	return true, nil
 }
