@@ -224,6 +224,7 @@ func GetFriendshipIdsWithNominations(personId string) ([]string, error) {
 		Id int `json:"id"`
 	}{}
 
+	//TODO: fix query so that edges aren't returned that aren't friendships within person's network
 	err := db.Cypher(&neoism.CypherQuery{
 		Statement: `
 	          MATCH (v:Person {fbId: {personId}})-[:FRIENDS]-(p:Person)-[:NOMINATED]->(friends)-[f:FRIENDS]-(p)
