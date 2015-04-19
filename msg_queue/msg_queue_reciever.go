@@ -89,7 +89,6 @@ func (queue *RecieverQueue) recieveMessage(rw http.ResponseWriter, req *http.Req
 			if _, onceCallbackExists := queue.OnceCallbacks[callbackId]; onceCallbackExists {
 				queue.UnregisterCallback(callbackId)
 				delete(queue.OnceCallbacks, callbackId)
-				log.Println(queue.OnceCallbacks)
 			}
 		}(callbackId, callback)
 	}
