@@ -2,6 +2,7 @@ package facebook
 
 import (
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 
@@ -57,7 +58,7 @@ type Person struct {
 func (session *Session) GetFriends() ([]*Person, error) {
 	res, fbErr := session.fbSession.Get("/me/friends", nil)
 	if fbErr != nil {
-		return nil, fbErr
+		return nil, errors.New("/me/friends " + fbErr.Error())
 	}
 
 	var friendsList []*Person
@@ -72,7 +73,7 @@ func (session *Session) GetFriends() ([]*Person, error) {
 func (session *Session) IsFriendsWith(userId string) (bool, error) {
 	res, fbErr := session.fbSession.Get("/me/friends/"+userId, nil)
 	if fbErr != nil {
-		return false, fbErr
+		return false, errors.New("/me/friends/" + userId + " " + fbErr.Error())
 	}
 
 	var friend []*Person
@@ -87,7 +88,7 @@ func (session *Session) IsFriendsWith(userId string) (bool, error) {
 func (session *Session) GetMutualFriendsWith(userId string) ([]*Person, error) {
 	res, fbErr := session.fbSession.Get("/"+userId+"/mutualfriends", nil)
 	if fbErr != nil {
-		return nil, fbErr
+		return nil, errors.New("/" + userId + "/mutualfriends " + fbErr.Error())
 	}
 
 	var mutualFriends []*Person
@@ -130,7 +131,7 @@ func (session *Session) GetUsersPostsBetween(userId string, startTime time.Time,
 		"until": toFbTimeString(endTime),
 	})
 	if getPostsErr != nil {
-		return nil, getPostsErr
+		return nil, errors.New("/" + userId + "/feed " + fbErr.Error())
 	}
 
 	decodeErr := res.DecodeField("data", &feed)
