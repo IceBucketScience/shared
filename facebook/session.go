@@ -131,7 +131,7 @@ func (session *Session) GetUsersPostsBetween(userId string, startTime time.Time,
 		"until": toFbTimeString(endTime),
 	})
 	if getPostsErr != nil {
-		return nil, errors.New("/" + userId + "/feed " + fbErr.Error())
+		return nil, errors.New("/" + userId + "/feed " + getPostsErr.Error())
 	}
 
 	decodeErr := res.DecodeField("data", &feed)
