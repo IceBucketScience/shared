@@ -45,7 +45,7 @@ func (t *Transaction) AddQuery(q *neoism.CypherQuery) {
 
 func (t *Transaction) Commit() error {
 	currTransactionQueries := []*neoism.CypherQuery{}
-
+	log.Println(len(t.queries), "queries to run")
 	for _, query := range t.queries {
 		if len(currTransactionQueries) == maxConcurrentDbRequests {
 			log.Println("len curr txs", len(currTransactionQueries))

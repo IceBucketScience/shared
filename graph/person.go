@@ -286,9 +286,9 @@ func GetFriendshipsInNetwork(personId string) ([]*Friendship, error) {
 
 	err := db.Cypher(&neoism.CypherQuery{
 		Statement: `
-            MATCH (v:Person {fbId: {fbId}})-[f:FRIENDS]->(friend:Person) 
+            MATCH (v:Person {fbId: {fbId}})-[f:FRIENDS]-(friend:Person) 
                 RETURN v.fbId AS sourceId, f, friend.fbId AS targetId
-            UNION MATCH (v:Person {fbId: {fbId}})-[:FRIENDS]-(p:Person)-[f:FRIENDS]->(friend:Person) 
+            UNION MATCH (v:Person {fbId: {fbId}})-[:FRIENDS]-(p:Person)-[f:FRIENDS]-(friend:Person) 
                 RETURN p.fbId AS sourceId, f, friend.fbId AS targetId
         `,
 		Parameters: neoism.Props{"fbId": personId},
