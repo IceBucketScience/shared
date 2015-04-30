@@ -288,7 +288,7 @@ func GetFriendshipsInNetwork(personId string) ([]*Friendship, error) {
 		Statement: `
             MATCH (v:Person {fbId: {fbId}})-[f:FRIENDS]-(friend:Person) 
                 RETURN v.fbId AS sourceId, f, friend.fbId AS targetId
-            UNION MATCH (v:Person {fbId: {fbId}})-[:FRIENDS]-(p:Person)-[f:FRIENDS]-(friend:Person) 
+            UNION MATCH (v:Person {fbId: {fbId}})-[:FRIENDS]-(p:Person)-[f:FRIENDS]-(friend:Person)-(v) 
                 RETURN p.fbId AS sourceId, f, friend.fbId AS targetId
         `,
 		Parameters: neoism.Props{"fbId": personId},
