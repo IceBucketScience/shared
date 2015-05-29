@@ -178,10 +178,6 @@ func relationshipExists(person1Id string, person2Id string, relName string) (boo
 	return true, nil
 }
 
-func (person *Person) IsLinkedTo(volunteer *Volunteer) (bool, error) {
-	return relationshipExists(person.FbId, volunteer.FbId, "LINKED")
-}
-
 //TODO: switch return val to pointer
 func (person *Person) GetFriends() (Graph, error) {
 	res := []struct {
@@ -212,10 +208,6 @@ func (person *Person) GetFriends() (Graph, error) {
 	}
 
 	return friends, nil
-}
-
-func NominationExists(person1Id string, person2Id string) (bool, error) {
-	return relationshipExists(person1Id, person2Id, "NOMINATED")
 }
 
 func (person *Person) AddNomination(nominatedBy *Person, nominationTime time.Time) error {
